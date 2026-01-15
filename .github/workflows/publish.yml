@@ -17,7 +17,8 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
@@ -25,6 +26,17 @@ jobs:
       - name: Install npm@latest
         run: npm install -g npm@latest
 
-      - run: pnpm install
-      - run: pnpm build
-      - run: pnpm publish --access public --no-git-checks
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Publish to npm
+        run: |
+          for i in 1 2 3 4; do
+            pnpm publish --no-git-checks && exit 0
+            echo "Attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+          exit 1

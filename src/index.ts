@@ -3,6 +3,35 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
+// ClickUp API response types
+interface Space {
+  id: string;
+  name: string;
+}
+interface Folder {
+  id: string;
+  name: string;
+  lists: List[];
+}
+interface List {
+  id: string;
+  name: string;
+}
+interface Member {
+  user: { id: number; username: string; email: string };
+}
+interface Task {
+  id: string;
+  name: string;
+  description?: string;
+  status?: { status: string };
+  priority?: { priority: string };
+  tags?: { name: string }[];
+  assignees?: { id: number; username: string }[];
+  due_date?: string;
+  url: string;
+}
+
 const API = "https://api.clickup.com/api/v2";
 const TOKEN = process.env.CLICKUP_API_TOKEN;
 const DEFAULT_TEAM = process.env.CLICKUP_TEAM_ID;
@@ -32,35 +61,40 @@ const server = new McpServer({ name: "clickup", version: "1.0.0" });
 
 // Get workspace hierarchy with members
 server.tool("hierarchy", "Get spaces/folders/lists", { team: z.string().optional() }, async ({ team }) => {
-  const t = team || DEFAULT_TEAM;
-  if (!t) throw new Error("team required (or set CLICKUP_TEAM_ID)");
-  const [teamInfo, spaces] = await Promise.all([
-    api("GET", `/team/${t}`),
-    api("GET", `/team/${t}/space?archived=false`),
+  const teamId = team || DEFAULT_TEAM;
+  if (!teamId) throw new Error("team required (or set CLICKUP_TEAM_ID)");
+
+  const [teamInfo, spacesRes] = await Promise.all([
+    api("GET", `/team/${teamId}`) as Promise<{ team: { members: Member[] } }>,
+    api("GET", `/team/${teamId}/space?archived=false`) as Promise<{ spaces: Space[] }>,
   ]);
-  const out = [];
-  for (const sp of (spaces as { spaces: Array<{ id: string; name: string }> }).spaces || []) {
-    const [folders, lists] = await Promise.all([
-      api("GET", `/space/${sp.id}/folder?archived=false`),
-      api("GET", `/space/${sp.id}/list?archived=false`),
-    ]);
-    out.push({
-      id: sp.id,
-      name: sp.name,
-      folders: ((folders as { folders: Array<{ id: string; name: string; lists: Array<{ id: string; name: string }> }> }).folders || []).map((f) => ({
-        id: f.id,
-        name: f.name,
-        lists: (f.lists || []).map((l) => ({ id: l.id, name: l.name })),
-      })),
-      lists: ((lists as { lists: Array<{ id: string; name: string }> }).lists || []).map((l) => ({ id: l.id, name: l.name })),
-    });
-  }
-  const members = ((teamInfo as { team: { members: Array<{ user: { id: number; username: string; email: string } }> } }).team?.members || []).map((m) => ({
+
+  const spaces = await Promise.all(
+    (spacesRes.spaces || []).map(async (sp) => {
+      const [foldersRes, listsRes] = await Promise.all([
+        api("GET", `/space/${sp.id}/folder?archived=false`) as Promise<{ folders: Folder[] }>,
+        api("GET", `/space/${sp.id}/list?archived=false`) as Promise<{ lists: List[] }>,
+      ]);
+      return {
+        id: sp.id,
+        name: sp.name,
+        folders: (foldersRes.folders || []).map((f) => ({
+          id: f.id,
+          name: f.name,
+          lists: (f.lists || []).map((l) => ({ id: l.id, name: l.name })),
+        })),
+        lists: (listsRes.lists || []).map((l) => ({ id: l.id, name: l.name })),
+      };
+    })
+  );
+
+  const members = (teamInfo.team?.members || []).map((m) => ({
     id: m.user.id,
     name: m.user.username,
     email: m.user.email,
   }));
-  return json({ spaces: out, members });
+
+  return json({ spaces, members });
 });
 
 // Search tasks with filters
@@ -75,50 +109,41 @@ server.tool(
     due_after: z.number().optional().describe("Tasks due after (Unix ms)"),
   },
   async ({ q, team, assignee, due_before, due_after }) => {
-    const t = team || DEFAULT_TEAM;
-    if (!t) throw new Error("team required (or set CLICKUP_TEAM_ID)");
+    const teamId = team || DEFAULT_TEAM;
+    if (!teamId) throw new Error("team required (or set CLICKUP_TEAM_ID)");
+
     const params = new URLSearchParams({ query: q });
     if (assignee) params.append("assignees[]", String(assignee));
     if (due_before) params.append("due_date_lt", String(due_before));
     if (due_after) params.append("due_date_gt", String(due_after));
-    const res = await api("GET", `/team/${t}/task?${params}`);
-    const tasks = ((res as { tasks: Array<{ id: string; name: string; status?: { status: string }; assignees?: Array<{ id: number; username: string }>; due_date?: string; url: string }> }).tasks || [])
-      .slice(0, 20)
-      .map((t) => ({
-        id: t.id,
-        name: t.name,
-        status: t.status?.status,
-        assignees: t.assignees?.map((a) => ({ id: a.id, name: a.username })),
-        due: t.due_date ? Number(t.due_date) : null,
-        url: t.url,
-      }));
+
+    const res = (await api("GET", `/team/${teamId}/task?${params}`)) as { tasks: Task[] };
+    const tasks = (res.tasks || []).slice(0, 20).map((task) => ({
+      id: task.id,
+      name: task.name,
+      status: task.status?.status,
+      assignees: task.assignees?.map((a) => ({ id: a.id, name: a.username })),
+      due: task.due_date ? Number(task.due_date) : null,
+      url: task.url,
+    }));
+
     return json(tasks);
   }
 );
 
 // Get task details
 server.tool("task", "Get task by ID", { id: z.string() }, async ({ id }) => {
-  const t = (await api("GET", `/task/${id}`)) as {
-    id: string;
-    name: string;
-    description: string;
-    status?: { status: string };
-    priority?: { priority: string };
-    tags?: Array<{ name: string }>;
-    assignees?: Array<{ id: number; username: string }>;
-    due_date?: string;
-    url: string;
-  };
+  const task = (await api("GET", `/task/${id}`)) as Task;
   return json({
-    id: t.id,
-    name: t.name,
-    desc: t.description,
-    status: t.status?.status,
-    priority: t.priority?.priority,
-    tags: t.tags?.map((x) => x.name),
-    assignees: t.assignees?.map((a) => ({ id: a.id, name: a.username })),
-    due: t.due_date ? Number(t.due_date) : null,
-    url: t.url,
+    id: task.id,
+    name: task.name,
+    desc: task.description,
+    status: task.status?.status,
+    priority: task.priority?.priority,
+    tags: task.tags?.map((t) => t.name),
+    assignees: task.assignees?.map((a) => ({ id: a.id, name: a.username })),
+    due: task.due_date ? Number(task.due_date) : null,
+    url: task.url,
   });
 });
 
@@ -178,24 +203,24 @@ server.tool("delete", "Delete task", { id: z.string() }, async ({ id }) => {
   return json({ ok: true });
 });
 
-// Add assignee
+// Add assignee (via update endpoint)
 server.tool(
   "assign",
   "Add assignee",
   { id: z.string(), user: z.number().describe("User ID") },
   async ({ id, user }) => {
-    await api("POST", `/task/${id}/assignee`, { assignee: user });
+    await api("PUT", `/task/${id}`, { assignees: { add: [user] } });
     return json({ ok: true });
   }
 );
 
-// Remove assignee
+// Remove assignee (via update endpoint)
 server.tool(
   "unassign",
   "Remove assignee",
   { id: z.string(), user: z.number().describe("User ID") },
   async ({ id, user }) => {
-    await api("DELETE", `/task/${id}/assignee`, { assignee: user });
+    await api("PUT", `/task/${id}`, { assignees: { rem: [user] } });
     return json({ ok: true });
   }
 );

@@ -1,0 +1,17 @@
+{
+  "name": "mcp-clickup-minimal",
+  "version": "1.0.0",
+  "description": "Minimal MCP server for ClickUp integration",
+  "type": "module",
+  "bin": "index.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^4.3.5"
+  }
+}

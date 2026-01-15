@@ -21,7 +21,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-          registry-url: "https://registry.npmjs.org"
 
       - name: Install npm@latest
         run: npm install -g npm@latest
@@ -32,5 +31,12 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Debug OIDC environment
+        run: |
+          echo "npm version: $(npm -v)"
+          echo "OIDC URL set: $([[ -n \"$ACTIONS_ID_TOKEN_REQUEST_URL\" ]] && echo yes || echo no)"
+          echo "NODE_AUTH_TOKEN set: $([[ -n \"$NODE_AUTH_TOKEN\" ]] && echo yes || echo no)"
+          cat ~/.npmrc 2>/dev/null || echo "No .npmrc"
+
       - name: Publish to npm
-        run: pnpm publish --no-git-checks --access public
+        run: npm publish --access public

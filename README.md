@@ -37,6 +37,7 @@ Get your ClickUp API token from: **ClickUp Settings > Apps > API Token**
 | `unassign` | Remove assignee from task |
 | `tag` | Add tag to task |
 | `untag` | Remove tag from task |
+| `attach` | Attach file (base64) to task |
 
 ## Development
 

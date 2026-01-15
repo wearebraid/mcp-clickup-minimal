@@ -267,4 +267,32 @@ server.registerTool(
   }
 );
 
+// Attach file to task
+server.registerTool(
+  "attach",
+  {
+    description: "Attach file to task",
+    inputSchema: {
+      id: z.string().describe("Task ID"),
+      filename: z.string().describe("Filename with extension"),
+      data: z.string().describe("Base64-encoded file content"),
+    },
+  },
+  async ({ id, filename, data }) => {
+    const buffer = Buffer.from(data, "base64");
+    const blob = new Blob([buffer]);
+    const form = new FormData();
+    form.append("attachment", blob, filename);
+
+    const res = await fetch(`${API}/task/${id}/attachment`, {
+      method: "POST",
+      headers: { Authorization: TOKEN! },
+      body: form,
+    });
+    if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+    const result = (await res.json()) as { id: string; url: string };
+    return json({ id: result.id, url: result.url });
+  }
+);
+
 await server.connect(new StdioServerTransport());

@@ -52,3 +52,4 @@ Copy `.env.example` to `.env` and fill in your ClickUp credentials:
 | unassign | Remove assignee from task |
 | tag | Add tag to task |
 | untag | Remove tag from task |
+| attach | Attach file (base64) to task |

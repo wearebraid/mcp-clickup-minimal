@@ -9,6 +9,7 @@
  *   CLICKUP_TEST_USER_ID
  */
 
+import { readFileSync } from "fs";
 import { config } from "dotenv";
 import { describe, it, beforeAll, afterAll, expect } from "vitest";
 
@@ -238,6 +239,59 @@ describe("ClickUp MCP Integration Tests", () => {
       expect(task.assignees?.some((a: { id: number }) => a.id === TEST_USER_ID)).toBe(true);
       expect(task.due_date).toBeDefined();
       expect(task.tags?.some((t: { name: string }) => t.name === "integration-test")).toBe(true);
+    });
+  });
+
+  describe("attachments", () => {
+    let taskId: string;
+
+    beforeAll(async () => {
+      const res = await api("POST", `/list/${TEST_LIST_ID}/task`, {
+        name: `Attachment Test ${Date.now()}`,
+      });
+      taskId = res.id;
+      createdTaskIds.push(taskId);
+    });
+
+    it("should attach test1.png to task", async () => {
+      const fileData = readFileSync("test1.png");
+      const base64 = fileData.toString("base64");
+
+      const form = new FormData();
+      form.append("attachment", new Blob([fileData]), "test1.png");
+
+      const res = await fetch(`${API}/task/${taskId}/attachment`, {
+        method: "POST",
+        headers: { Authorization: TOKEN! },
+        body: form,
+      });
+
+      expect(res.ok).toBe(true);
+      const result = await res.json();
+      expect(result.id).toBeDefined();
+      expect(result.url).toBeDefined();
+    });
+
+    it("should attach test2.png to task", async () => {
+      const fileData = readFileSync("test2.png");
+
+      const form = new FormData();
+      form.append("attachment", new Blob([fileData]), "test2.png");
+
+      const res = await fetch(`${API}/task/${taskId}/attachment`, {
+        method: "POST",
+        headers: { Authorization: TOKEN! },
+        body: form,
+      });
+
+      expect(res.ok).toBe(true);
+      const result = await res.json();
+      expect(result.id).toBeDefined();
+    });
+
+    it("should show attachments on task", async () => {
+      const task = await api("GET", `/task/${taskId}`);
+      expect(task.attachments?.length).toBe(2);
     });
   });
 });

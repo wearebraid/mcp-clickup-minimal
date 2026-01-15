@@ -253,12 +253,12 @@ describe("ClickUp MCP Integration Tests", () => {
       createdTaskIds.push(taskId);
     });
 
-    it("should attach test1.png to task", async () => {
-      const fileData = readFileSync("test1.png");
+    it("should attach test1.webp to task", async () => {
+      const fileData = readFileSync("test1.webp");
       const base64 = fileData.toString("base64");
 
       const form = new FormData();
-      form.append("attachment", new Blob([fileData]), "test1.png");
+      form.append("attachment", new Blob([fileData]), "test1.webp");
 
       const res = await fetch(`${API}/task/${taskId}/attachment`, {
         method: "POST",
@@ -272,11 +272,11 @@ describe("ClickUp MCP Integration Tests", () => {
       expect(result.url).toBeDefined();
     });
 
-    it("should attach test2.png to task", async () => {
-      const fileData = readFileSync("test2.png");
+    it("should attach test2.webp to task", async () => {
+      const fileData = readFileSync("test2.webp");
 
       const form = new FormData();
-      form.append("attachment", new Blob([fileData]), "test2.png");
+      form.append("attachment", new Blob([fileData]), "test2.webp");
 
       const res = await fetch(`${API}/task/${taskId}/attachment`, {
         method: "POST",

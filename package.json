@@ -8,7 +8,12 @@
     "url": "git+https://github.com/wearebraid/mcp-clickup-minimal.git"
   },
   "type": "module",
-  "bin": "dist/index.js",
+  "bin": {
+    "mcp-clickup": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
   "engines": {
     "node": ">=18"
   },
@@ -16,6 +21,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "vitest run",
+    "prepublishOnly": "pnpm build",
     "release": "pnpm build && bumpp --git-check",
     "prepare": "husky"
   },

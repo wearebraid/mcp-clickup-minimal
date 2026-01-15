@@ -26,11 +26,29 @@ jobs:
       - name: Install npm@latest
         run: npm install -g npm@latest
 
+      - name: Debug OIDC environment
+        run: |
+          echo "=== OIDC env vars ==="
+          echo "ACTIONS_ID_TOKEN_REQUEST_URL: ${ACTIONS_ID_TOKEN_REQUEST_URL:-NOT SET}"
+          echo "ACTIONS_ID_TOKEN_REQUEST_TOKEN length: ${#ACTIONS_ID_TOKEN_REQUEST_TOKEN}"
+          echo "=== .npmrc location ==="
+          npm config get userconfig
+          echo "=== .npmrc contents ==="
+          cat "$(npm config get userconfig)" || echo "File not found"
+
+      - name: Clear auth token from npmrc
+        run: |
+          NPMRC=$(npm config get userconfig)
+          echo "Clearing _authToken from $NPMRC"
+          sed -i '/_authToken/d' "$NPMRC"
+          echo "=== Updated .npmrc ==="
+          cat "$NPMRC"
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Build
         run: pnpm build
 
-      - name: Publish to npm (using npm directly)
+      - name: Publish to npm
         run: npm publish --access public

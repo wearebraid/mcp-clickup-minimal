@@ -5,31 +5,32 @@ on:
     tags:
       - "v*"
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   publish:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+          registry-url: "https://registry.npmjs.org"
 
-      - name: Install npm@latest
-        run: npm install -g npm@latest
+      - name: Update npm to latest
+        run: |
+          npm install -g npm@latest
+          echo "npm version: $(npm --version)"
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm install
 
       - name: Build
-        run: pnpm build
+        run: npm run build
 
-      - name: Publish to npm
-        run: npm publish --access public
+      - name: Publish to npm (unset token for OIDC)
+        run: unset NODE_AUTH_TOKEN && npm publish --access public

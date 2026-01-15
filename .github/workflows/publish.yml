@@ -31,22 +31,7 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Debug environment
-        run: |
-          echo "=== Environment ==="
-          echo "npm: $(npm -v)"
-          echo "node: $(node -v)"
-          echo "OIDC URL: $ACTIONS_ID_TOKEN_REQUEST_URL"
-          echo "OIDC TOKEN: ${ACTIONS_ID_TOKEN_REQUEST_TOKEN:+set}"
-          echo "=== npmrc files ==="
-          cat ~/.npmrc 2>/dev/null || echo "No ~/.npmrc"
-          cat .npmrc 2>/dev/null || echo "No ./.npmrc"
-          echo "=== Package info ==="
-          npm pkg get name version repository
-
-      - name: Publish to npm with OIDC
-        run: |
-          unset NODE_AUTH_TOKEN
-          npm publish --access public --loglevel verbose 2>&1
+      - name: Publish to npm
+        run: npm publish --access public
         env:
           NPM_CONFIG_PROVENANCE: "true"

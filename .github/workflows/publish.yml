@@ -18,25 +18,13 @@ jobs:
         uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
 
       - name: Install npm@latest
         run: npm install -g npm@latest
-
-      - name: Debug - Show versions and config
-        run: |
-          echo "=== npm version ==="
-          npm --version
-          echo "=== pnpm version ==="
-          pnpm --version
-          echo "=== .npmrc contents ==="
-          cat ~/.npmrc || echo "No ~/.npmrc"
-          cat .npmrc || echo "No .npmrc in project"
-          echo "=== npm config list ==="
-          npm config list
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -45,10 +33,4 @@ jobs:
         run: pnpm build
 
       - name: Publish to npm
-        run: |
-          for i in 1 2 3 4; do
-            pnpm publish --no-git-checks && exit 0
-            echo "Attempt $i failed, retrying in 10s..."
-            sleep 10
-          done
-          exit 1
+        run: pnpm publish --no-git-checks

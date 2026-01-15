@@ -60,53 +60,59 @@ function json(data: object) {
 const server = new McpServer({ name: "clickup", version: "1.0.0" });
 
 // Get workspace hierarchy with members
-server.tool("hierarchy", "Get spaces/folders/lists", { team: z.string().optional() }, async ({ team }) => {
-  const teamId = team || DEFAULT_TEAM;
-  if (!teamId) throw new Error("team required (or set CLICKUP_TEAM_ID)");
+server.registerTool(
+  "hierarchy",
+  { description: "Get spaces/folders/lists", inputSchema: { team: z.string().optional() } },
+  async ({ team }) => {
+    const teamId = team || DEFAULT_TEAM;
+    if (!teamId) throw new Error("team required (or set CLICKUP_TEAM_ID)");
 
-  const [teamInfo, spacesRes] = await Promise.all([
-    api("GET", `/team/${teamId}`) as Promise<{ team: { members: Member[] } }>,
-    api("GET", `/team/${teamId}/space?archived=false`) as Promise<{ spaces: Space[] }>,
-  ]);
+    const [teamInfo, spacesRes] = await Promise.all([
+      api("GET", `/team/${teamId}`) as Promise<{ team: { members: Member[] } }>,
+      api("GET", `/team/${teamId}/space?archived=false`) as Promise<{ spaces: Space[] }>,
+    ]);
 
-  const spaces = await Promise.all(
-    (spacesRes.spaces || []).map(async (sp) => {
-      const [foldersRes, listsRes] = await Promise.all([
-        api("GET", `/space/${sp.id}/folder?archived=false`) as Promise<{ folders: Folder[] }>,
-        api("GET", `/space/${sp.id}/list?archived=false`) as Promise<{ lists: List[] }>,
-      ]);
-      return {
-        id: sp.id,
-        name: sp.name,
-        folders: (foldersRes.folders || []).map((f) => ({
-          id: f.id,
-          name: f.name,
-          lists: (f.lists || []).map((l) => ({ id: l.id, name: l.name })),
-        })),
-        lists: (listsRes.lists || []).map((l) => ({ id: l.id, name: l.name })),
-      };
-    })
-  );
+    const spaces = await Promise.all(
+      (spacesRes.spaces || []).map(async (sp) => {
+        const [foldersRes, listsRes] = await Promise.all([
+          api("GET", `/space/${sp.id}/folder?archived=false`) as Promise<{ folders: Folder[] }>,
+          api("GET", `/space/${sp.id}/list?archived=false`) as Promise<{ lists: List[] }>,
+        ]);
+        return {
+          id: sp.id,
+          name: sp.name,
+          folders: (foldersRes.folders || []).map((f) => ({
+            id: f.id,
+            name: f.name,
+            lists: (f.lists || []).map((l) => ({ id: l.id, name: l.name })),
+          })),
+          lists: (listsRes.lists || []).map((l) => ({ id: l.id, name: l.name })),
+        };
+      })
+    );
 
-  const members = (teamInfo.team?.members || []).map((m) => ({
-    id: m.user.id,
-    name: m.user.username,
-    email: m.user.email,
-  }));
+    const members = (teamInfo.team?.members || []).map((m) => ({
+      id: m.user.id,
+      name: m.user.username,
+      email: m.user.email,
+    }));
 
-  return json({ spaces, members });
-});
+    return json({ spaces, members });
+  }
+);
 
 // Search tasks with filters
-server.tool(
+server.registerTool(
   "search",
-  "Search tasks",
   {
-    q: z.string(),
-    team: z.string().optional(),
-    assignee: z.number().optional().describe("Filter by user ID"),
-    due_before: z.number().optional().describe("Tasks due before (Unix ms)"),
-    due_after: z.number().optional().describe("Tasks due after (Unix ms)"),
+    description: "Search tasks",
+    inputSchema: {
+      q: z.string(),
+      team: z.string().optional(),
+      assignee: z.number().optional().describe("Filter by user ID"),
+      due_before: z.number().optional().describe("Tasks due before (Unix ms)"),
+      due_after: z.number().optional().describe("Tasks due after (Unix ms)"),
+    },
   },
   async ({ q, team, assignee, due_before, due_after }) => {
     const teamId = team || DEFAULT_TEAM;
@@ -132,33 +138,39 @@ server.tool(
 );
 
 // Get task details
-server.tool("task", "Get task by ID", { id: z.string() }, async ({ id }) => {
-  const task = (await api("GET", `/task/${id}`)) as Task;
-  return json({
-    id: task.id,
-    name: task.name,
-    desc: task.description,
-    status: task.status?.status,
-    priority: task.priority?.priority,
-    tags: task.tags?.map((t) => t.name),
-    assignees: task.assignees?.map((a) => ({ id: a.id, name: a.username })),
-    due: task.due_date ? Number(task.due_date) : null,
-    url: task.url,
-  });
-});
+server.registerTool(
+  "task",
+  { description: "Get task by ID", inputSchema: { id: z.string() } },
+  async ({ id }) => {
+    const task = (await api("GET", `/task/${id}`)) as Task;
+    return json({
+      id: task.id,
+      name: task.name,
+      desc: task.description,
+      status: task.status?.status,
+      priority: task.priority?.priority,
+      tags: task.tags?.map((t) => t.name),
+      assignees: task.assignees?.map((a) => ({ id: a.id, name: a.username })),
+      due: task.due_date ? Number(task.due_date) : null,
+      url: task.url,
+    });
+  }
+);
 
 // Create task
-server.tool(
+server.registerTool(
   "create",
-  "Create task",
   {
-    list: z.string(),
-    name: z.string(),
-    desc: z.string().optional(),
-    priority: z.number().optional(),
-    tags: z.array(z.string()).optional(),
-    due: z.number().optional().describe("Due date (Unix ms)"),
-    assignees: z.array(z.number()).optional().describe("User IDs to assign"),
+    description: "Create task",
+    inputSchema: {
+      list: z.string(),
+      name: z.string(),
+      desc: z.string().optional(),
+      priority: z.number().optional(),
+      tags: z.array(z.string()).optional(),
+      due: z.number().optional().describe("Due date (Unix ms)"),
+      assignees: z.array(z.number()).optional().describe("User IDs to assign"),
+    },
   },
   async ({ list, name, desc, priority, tags, due, assignees }) => {
     const t = (await api("POST", `/list/${list}/task`, {
@@ -174,16 +186,18 @@ server.tool(
 );
 
 // Update task
-server.tool(
+server.registerTool(
   "update",
-  "Update task",
   {
-    id: z.string(),
-    name: z.string().optional(),
-    desc: z.string().optional(),
-    status: z.string().optional(),
-    priority: z.number().optional(),
-    due: z.number().optional().describe("Due date (Unix ms), use 0 to clear"),
+    description: "Update task",
+    inputSchema: {
+      id: z.string(),
+      name: z.string().optional(),
+      desc: z.string().optional(),
+      status: z.string().optional(),
+      priority: z.number().optional(),
+      due: z.number().optional().describe("Due date (Unix ms), use 0 to clear"),
+    },
   },
   async ({ id, name, desc, status, priority, due }) => {
     const body: Record<string, unknown> = {};
@@ -198,16 +212,22 @@ server.tool(
 );
 
 // Delete task
-server.tool("delete", "Delete task", { id: z.string() }, async ({ id }) => {
-  await api("DELETE", `/task/${id}`);
-  return json({ ok: true });
-});
+server.registerTool(
+  "delete",
+  { description: "Delete task", inputSchema: { id: z.string() } },
+  async ({ id }) => {
+    await api("DELETE", `/task/${id}`);
+    return json({ ok: true });
+  }
+);
 
 // Add assignee (via update endpoint)
-server.tool(
+server.registerTool(
   "assign",
-  "Add assignee",
-  { id: z.string(), user: z.number().describe("User ID") },
+  {
+    description: "Add assignee",
+    inputSchema: { id: z.string(), user: z.number().describe("User ID") },
+  },
   async ({ id, user }) => {
     await api("PUT", `/task/${id}`, { assignees: { add: [user] } });
     return json({ ok: true });
@@ -215,10 +235,12 @@ server.tool(
 );
 
 // Remove assignee (via update endpoint)
-server.tool(
+server.registerTool(
   "unassign",
-  "Remove assignee",
-  { id: z.string(), user: z.number().describe("User ID") },
+  {
+    description: "Remove assignee",
+    inputSchema: { id: z.string(), user: z.number().describe("User ID") },
+  },
   async ({ id, user }) => {
     await api("PUT", `/task/${id}`, { assignees: { rem: [user] } });
     return json({ ok: true });
@@ -226,15 +248,23 @@ server.tool(
 );
 
 // Add tag
-server.tool("tag", "Add tag", { id: z.string(), tag: z.string() }, async ({ id, tag }) => {
-  await api("POST", `/task/${id}/tag/${encodeURIComponent(tag)}`, {});
-  return json({ ok: true });
-});
+server.registerTool(
+  "tag",
+  { description: "Add tag", inputSchema: { id: z.string(), tag: z.string() } },
+  async ({ id, tag }) => {
+    await api("POST", `/task/${id}/tag/${encodeURIComponent(tag)}`, {});
+    return json({ ok: true });
+  }
+);
 
 // Remove tag
-server.tool("untag", "Remove tag", { id: z.string(), tag: z.string() }, async ({ id, tag }) => {
-  await api("DELETE", `/task/${id}/tag/${encodeURIComponent(tag)}`);
-  return json({ ok: true });
-});
+server.registerTool(
+  "untag",
+  { description: "Remove tag", inputSchema: { id: z.string(), tag: z.string() } },
+  async ({ id, tag }) => {
+    await api("DELETE", `/task/${id}/tag/${encodeURIComponent(tag)}`);
+    return json({ ok: true });
+  }
+);
 
 await server.connect(new StdioServerTransport());

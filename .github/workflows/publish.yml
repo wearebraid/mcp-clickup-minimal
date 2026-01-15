@@ -20,7 +20,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
 
       - name: Install npm@latest
         run: npm install -g npm@latest
@@ -34,9 +34,13 @@ jobs:
       - name: Debug OIDC environment
         run: |
           echo "npm version: $(npm -v)"
-          echo "OIDC URL set: $([[ -n \"$ACTIONS_ID_TOKEN_REQUEST_URL\" ]] && echo yes || echo no)"
-          echo "NODE_AUTH_TOKEN set: $([[ -n \"$NODE_AUTH_TOKEN\" ]] && echo yes || echo no)"
-          cat ~/.npmrc 2>/dev/null || echo "No .npmrc"
+          echo "node version: $(node -v)"
+          echo "OIDC URL set: $([[ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ]] && echo yes || echo no)"
+          cat ~/.npmrc 2>/dev/null || echo "No user .npmrc"
+          cat .npmrc 2>/dev/null || echo "No project .npmrc"
 
-      - name: Publish to npm
+      - name: Publish to npm with OIDC
         run: npm publish --access public
+        env:
+          NPM_CONFIG_PROVENANCE: true
+          NODE_AUTH_TOKEN: ""

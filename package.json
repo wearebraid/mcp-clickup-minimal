@@ -1,6 +1,6 @@
 {
   "name": "@braid/mcp-clickup",
-  "version": "0.0.7",
+  "version": "0.0.1",
   "description": "Minimal MCP server for ClickUp integration",
   "license": "MIT",
   "repository": {

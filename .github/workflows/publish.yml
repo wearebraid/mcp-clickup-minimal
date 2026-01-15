@@ -18,13 +18,25 @@ jobs:
         uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
 
       - name: Install npm@latest
         run: npm install -g npm@latest
+
+      - name: Debug - Show versions and config
+        run: |
+          echo "=== npm version ==="
+          npm --version
+          echo "=== pnpm version ==="
+          pnpm --version
+          echo "=== .npmrc contents ==="
+          cat ~/.npmrc || echo "No ~/.npmrc"
+          cat .npmrc || echo "No .npmrc in project"
+          echo "=== npm config list ==="
+          npm config list
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
